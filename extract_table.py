@@ -1,9 +1,10 @@
 import cv2
 import numpy as np
+from ctpn.ctpn_blstm_test import text_predict
+from densent_ocr.densenet_ocr_test import predict
 
 
 def table_lines(src):
-    from PIL import Image
     src_height, src_width = src.shape[:2]
     gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
 
@@ -136,7 +137,7 @@ def extract_table(image_path):
     horizontalStructure = cv2.getStructuringElement(cv2.MORPH_RECT, (horizontalsize, 1))
     horizontal = cv2.erode(horizontal, horizontalStructure, (-1, -1))
     horizontal = cv2.dilate(horizontal, horizontalStructure, (-1, -1))
-    horizontal = cv2.blur(horizontal, (10, 10))
+    horizontal = cv2.blur(horizontal, (3, 3))
     # Image.fromarray(horizontal).show()
     # horizontal = cv2.dilate(horizontal, horizontalStructure, (20, 20))
 
@@ -146,20 +147,13 @@ def extract_table(image_path):
     vertical = cv2.erode(vertical, verticalStructure, (-1, -1))
     vertical = cv2.dilate(vertical, verticalStructure, (-1, -1))
     # Image.fromarray(vertical).show()
-    vertical = cv2.blur(vertical, (10, 10))
+    vertical = cv2.blur(vertical, (3, 3))
 
-    import scipy
     mask = horizontal + vertical
-    from pprint import pprint
-    mask[mask != 0] = 255
-    print(mask[mask != 0])
-    # mask = scipy.ndimage.filters.maximum_filter(mask, 5)
 
     joints = cv2.bitwise_and(horizontal, vertical)
-    joints2 = cv2.bitwise_or(gray, mask)
     # print(horizontal)
-    joints2 = cv2.blur(joints2, (3, 3))
-    Image.fromarray(joints2).show()
+    # Image.fromarray(joints).show()
     if not joints.any():
         return 'not table'
 
@@ -189,12 +183,13 @@ def extract_table(image_path):
             continue
 
         ytt = src[boundRect[i][1]:boundRect[i][1] + boundRect[i][3], boundRect[i][0]:boundRect[i][0] + boundRect[i][2]]
-        Image.fromarray(ytt).save('data/{}.jpg'.format(i))
+        # Image.fromarray(ytt).save('data/{}.jpg'.format(i))
 
         # rois.append(src(boundRect[i]).clone())
         rois.append([ytt, list(boundRect[i])])
         # cv2.rectangle(src, (boundRect[i][0], boundRect[i][1]), (boundRect[i][0] + boundRect[i][2], boundRect[i][1] + boundRect[i][3]), (0, 255, 0), 3)
     new_img = sorted(rois, key=lambda i: i[1][3])[-1][0]
+
     cols, rows, col_point, row_point, tables = table_lines(new_img)
     col_point = sorted(col_point)
     row_point = sorted(row_point)
@@ -241,6 +236,7 @@ def extract_table(image_path):
     # for i in tables:
     #     print(i[2])
     # Image.fromarray(new_img[111: 111+209, 344:344+319]).show()
+    # print(44444444, cols, rows, tables)
     generate_table(cols, rows, tables)
     Image.fromarray(src).save('space_d.jpg')
 
@@ -249,19 +245,29 @@ import docx
 
 
 def generate_table(cols, rows, tables):
+    from PIL import Image
     document = docx.Document()
     table = document.add_table(rows, cols)
     for i in tables:
         d = i[2]
-        if d['col_end'] - d['col_begin'] == 1 and d['row_end'] - d['row_begin'] == 1:
-            continue
+        # if d['col_end'] - d['col_begin'] == 1 and d['row_end'] - d['row_begin'] == 1:
+        #     continue
         if d['col_end'] - d['col_begin'] != 1:
             for col in range(d['col_begin'], d['col_end']):
                 table.cell(d['row_begin'], d['col_begin']).merge(table.cell(d['row_begin'], col))
         if d['row_end'] - d['row_begin'] != 1:
             for row in range(d['row_begin'], d['row_end']):
                 table.cell(d['row_begin'], d['col_begin']).merge(table.cell(row, d['col_begin']))
+        texts = ''
+        images = text_predict(i[0])
+        if not images:
+            texts += predict(i[0])[0]
+        for image in sorted(images, key=lambda i:i[0][1]):
+            if image[1].any():
+                texts += predict(image[1])[0]
+        print(texts)
+        table.cell(d['row_begin'], d['col_begin']).text = texts
     document.save('space.docx')
 
 
-extract_table('06.jpg')
+extract_table('04.jpg')
