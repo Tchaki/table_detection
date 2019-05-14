@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from ctpn.ctpn_blstm_test import text_predict
-from densent_ocr.densenet_ocr_test import predict
+from ctpn.ctpn_blstm_test import text_predict   # Text detection
+from densent_ocr.densenet_ocr_test import predict   # Text recognition
 
 
 def table_lines(src):
